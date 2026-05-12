@@ -1,5 +1,4 @@
 const { z } = require('zod');
-
 const exposicionesService = require('./exposiciones.service');
 const { formatError } = require('../../middlewares/errorHandler.middleware');
 
@@ -13,9 +12,18 @@ const habilitarInputSchema = z.object({
   minutos_ventana: z.literal(10).or(z.literal(15)),
 });
 
+// FIX: password_confirmacion es obligatorio cuando metodo = 'password'
 const cierreInputSchema = z.object({
   metodo: z.enum(['password', 'captcha']),
   password_confirmacion: z.string().optional(),
+}).superRefine((val, ctx) => {
+  if (val.metodo === 'password' && !val.password_confirmacion) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'password_confirmacion es requerido cuando metodo es password',
+      path: ['password_confirmacion'],
+    });
+  }
 });
 
 const paginationSchema = z.object({
@@ -26,23 +34,10 @@ const paginationSchema = z.object({
 const listar = async (req, res, next) => {
   try {
     const parsed = paginationSchema.safeParse(req.query);
-
     if (!parsed.success) {
-      return res.status(400).json(
-        formatError(
-          400,
-          parsed.error.issues[0]?.message || 'Parametros invalidos',
-          req.originalUrl
-        )
-      );
+      return res.status(400).json(formatError(400, parsed.error.issues[0]?.message || 'Parametros invalidos', req.originalUrl));
     }
-
-    const result = await exposicionesService.listar(
-      req.user,
-      parsed.data.page,
-      parsed.data.size
-    );
-
+    const result = await exposicionesService.listar(req.user, parsed.data.page, parsed.data.size);
     return res.status(200).json(result);
   } catch (err) {
     next(err);
@@ -52,15 +47,10 @@ const listar = async (req, res, next) => {
 const obtener = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
-
     if (!id || id < 1) {
-      return res.status(400).json(
-        formatError(400, 'ID invalido', req.originalUrl)
-      );
+      return res.status(400).json(formatError(400, 'ID invalido', req.originalUrl));
     }
-
     const exposicion = await exposicionesService.obtener(id);
-
     return res.status(200).json(exposicion);
   } catch (err) {
     next(err);
@@ -70,19 +60,10 @@ const obtener = async (req, res, next) => {
 const crear = async (req, res, next) => {
   try {
     const parsed = exposicionInputSchema.safeParse(req.body);
-
     if (!parsed.success) {
-      return res.status(400).json(
-        formatError(
-          400,
-          parsed.error.issues[0]?.message || 'Datos invalidos',
-          req.originalUrl
-        )
-      );
+      return res.status(400).json(formatError(400, parsed.error.issues[0]?.message || 'Datos invalidos', req.originalUrl));
     }
-
     const exposicion = await exposicionesService.crear(parsed.data);
-
     return res.status(201).json(exposicion);
   } catch (err) {
     next(err);
@@ -92,27 +73,14 @@ const crear = async (req, res, next) => {
 const actualizar = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
-
     if (!id || id < 1) {
-      return res.status(400).json(
-        formatError(400, 'ID invalido', req.originalUrl)
-      );
+      return res.status(400).json(formatError(400, 'ID invalido', req.originalUrl));
     }
-
     const parsed = exposicionInputSchema.safeParse(req.body);
-
     if (!parsed.success) {
-      return res.status(400).json(
-        formatError(
-          400,
-          parsed.error.issues[0]?.message || 'Datos invalidos',
-          req.originalUrl
-        )
-      );
+      return res.status(400).json(formatError(400, parsed.error.issues[0]?.message || 'Datos invalidos', req.originalUrl));
     }
-
     const exposicion = await exposicionesService.actualizar(id, parsed.data);
-
     return res.status(200).json(exposicion);
   } catch (err) {
     next(err);
@@ -122,15 +90,10 @@ const actualizar = async (req, res, next) => {
 const eliminar = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
-
     if (!id || id < 1) {
-      return res.status(400).json(
-        formatError(400, 'ID invalido', req.originalUrl)
-      );
+      return res.status(400).json(formatError(400, 'ID invalido', req.originalUrl));
     }
-
     await exposicionesService.eliminar(id);
-
     return res.status(204).send();
   } catch (err) {
     next(err);
@@ -140,30 +103,14 @@ const eliminar = async (req, res, next) => {
 const habilitar = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
-
     if (!id || id < 1) {
-      return res.status(400).json(
-        formatError(400, 'ID invalido', req.originalUrl)
-      );
+      return res.status(400).json(formatError(400, 'ID invalido', req.originalUrl));
     }
-
     const parsed = habilitarInputSchema.safeParse(req.body);
-
     if (!parsed.success) {
-      return res.status(400).json(
-        formatError(
-          400,
-          parsed.error.issues[0]?.message || 'Datos invalidos',
-          req.originalUrl
-        )
-      );
+      return res.status(400).json(formatError(400, parsed.error.issues[0]?.message || 'Datos invalidos', req.originalUrl));
     }
-
-    const result = await exposicionesService.habilitar(
-      id,
-      parsed.data.minutos_ventana
-    );
-
+    const result = await exposicionesService.habilitar(id, parsed.data.minutos_ventana);
     return res.status(200).json(result);
   } catch (err) {
     next(err);
@@ -173,43 +120,18 @@ const habilitar = async (req, res, next) => {
 const cerrar = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
-
     if (!id || id < 1) {
-      return res.status(400).json(
-        formatError(400, 'ID invalido', req.originalUrl)
-      );
+      return res.status(400).json(formatError(400, 'ID invalido', req.originalUrl));
     }
-
     const parsed = cierreInputSchema.safeParse(req.body);
-
     if (!parsed.success) {
-      return res.status(400).json(
-        formatError(
-          400,
-          parsed.error.issues[0]?.message || 'Datos invalidos',
-          req.originalUrl
-        )
-      );
+      return res.status(400).json(formatError(400, parsed.error.issues[0]?.message || 'Datos invalidos', req.originalUrl));
     }
-
-    const result = await exposicionesService.cerrar(
-      id,
-      parsed.data,
-      req.user
-    );
-
+    const result = await exposicionesService.cerrar(id, parsed.data, req.user);
     return res.status(200).json(result);
   } catch (err) {
     next(err);
   }
 };
 
-module.exports = {
-  listar,
-  obtener,
-  crear,
-  actualizar,
-  eliminar,
-  habilitar,
-  cerrar,
-};
+module.exports = { listar, obtener, crear, actualizar, eliminar, habilitar, cerrar };
