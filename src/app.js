@@ -8,6 +8,7 @@ const { errorHandler } = require('./middlewares/errorHandler.middleware');
 const equiposRoutes = require('./modules/equipos/equipos.routes');
 const exposicionesRoutes = require('./modules/exposiciones/exposiciones.routes');
 const permisosRoutes = require('./modules/permisos/permisos.routes');
+const evaluacionesRoutes = require('./modules/evaluaciones/evaluaciones.routes');
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use('/api/v1/alumnos', alumnosRoutes);
 app.use('/api/v1/equipos', equiposRoutes);
 app.use('/api/v1/exposiciones', exposicionesRoutes);
 app.use('/api/v1/permisos', permisosRoutes);
+app.use('/api/v1/evaluaciones', evaluacionesRoutes);
 
 app.use(errorHandler);
 
