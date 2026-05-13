@@ -62,7 +62,7 @@ const listar = async (user, page, size) => {
   const { data, error, count } = await supabase
     .from('exposiciones')
     .select('*', { count: 'exact' })
-    .eq('estado', 'activa')
+    .neq('estado', 'pendiente')
     .in('id_exposicion', idsExposiciones)
     .range(from, to);
 
