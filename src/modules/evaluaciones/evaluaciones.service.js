@@ -37,13 +37,10 @@ const registrar = async (id_usuario, { id_exposicion, detalles }) => {
   // RN09-4: permiso debe estar habilitado
   if (!permiso.habilitado) throw new AppError(403, 'El permiso de evaluacion no esta habilitado');
 
-  // RN09-5: misma fecha calendario que fecha_apertura
-  const hoy = new Date().toISOString().slice(0, 10);
-  const diaApertura = new Date(permiso.fecha_apertura).toISOString().slice(0, 10);
-  if (hoy !== diaApertura) throw new AppError(403, 'La evaluacion solo puede realizarse el dia de apertura');
-
-  // RN09-6: dentro de la ventana de tiempo
-  if (new Date() > new Date(permiso.fecha_cierre)) {
+  // RN09-5/6: verificar expiración solo en ventana normal (no aplica cuando el docente reabre)
+  // Cuando el docente reabre, fecha_cierre = 2099 (centinela sin restricción de tiempo)
+  const sinRestriccion = new Date(permiso.fecha_cierre) >= new Date('2099-01-01');
+  if (!sinRestriccion && new Date() > new Date(permiso.fecha_cierre)) {
     throw new AppError(403, 'La ventana de evaluacion ha expirado');
   }
 
@@ -161,21 +158,37 @@ const consultarResultados = async (id_exposicion) => {
   if (error) throw new AppError(500, 'Error al obtener resultados');
 
   if (evaluaciones.length === 0) {
-    return { id_exposicion, evaluaciones: [], promedio_general: 0 };
+    return { id_exposicion, evaluaciones: [], criterios: {}, promedio_general: 0 };
   }
 
   const ids = evaluaciones.map(e => e.id_evaluacion);
   const { data: detalles, error: detallesError } = await supabase
     .from('detalle_evaluacion')
-    .select('*')
+    .select('*, criterios(id_criterio, descripcion, ponderacion)')
     .in('id_evaluacion', ids);
 
   if (detallesError) throw new AppError(500, 'Error al obtener detalles de evaluacion');
 
+  // Mapa criterio_id → { descripcion, ponderacion } extraído de los detalles
+  const criteriosMap = {};
+  for (const d of detalles || []) {
+    if (d.criterios && !criteriosMap[d.id_criterio]) {
+      criteriosMap[d.id_criterio] = {
+        descripcion: d.criterios.descripcion,
+        ponderacion: d.criterios.ponderacion,
+      };
+    }
+  }
+
   const detallesPorEval = {};
   for (const d of detalles || []) {
     if (!detallesPorEval[d.id_evaluacion]) detallesPorEval[d.id_evaluacion] = [];
-    detallesPorEval[d.id_evaluacion].push(d);
+    detallesPorEval[d.id_evaluacion].push({
+      id_detalle: d.id_detalle,
+      id_evaluacion: d.id_evaluacion,
+      id_criterio: d.id_criterio,
+      calificacion: d.calificacion,
+    });
   }
 
   const resultado = evaluaciones.map(e => ({
@@ -189,6 +202,7 @@ const consultarResultados = async (id_exposicion) => {
   return {
     id_exposicion,
     evaluaciones: resultado,
+    criterios: criteriosMap,
     promedio_general: Math.round(promedio_general * 100) / 100,
   };
 };

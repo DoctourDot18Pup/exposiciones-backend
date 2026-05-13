@@ -1,26 +1,26 @@
-# Sistema de Exposiciones — Backend API
+# SII Lince — Sistema de Coevaluación de Exposiciones
 
-API REST para la gestión de exposiciones académicas con coevaluación entre alumnos. Desarrollada con Node.js, Express y Supabase (PostgreSQL).
+> TecNM · Campus Celaya · Ciclo Ene–Jun 2026
+
+Plataforma web para la **gestión y coevaluación de exposiciones académicas** entre alumnos de un grupo. Los docentes programan exposiciones, habilitan ventanas de evaluación y consultan resultados; los alumnos califican a sus compañeros usando una rúbrica por criterios ponderados.
 
 ---
 
-## Tabla de contenidos
+## Índice
 
 - [Stack tecnológico](#stack-tecnológico)
+- [Arquitectura](#arquitectura)
 - [Requisitos previos](#requisitos-previos)
 - [Instalación y configuración](#instalación-y-configuración)
 - [Variables de entorno](#variables-de-entorno)
 - [Estructura del proyecto](#estructura-del-proyecto)
-- [Diseño de base de datos](#diseño-de-base-de-datos)
-- [Arquitectura de módulos](#arquitectura-de-módulos)
-- [Autenticación](#autenticación)
+- [Base de datos](#base-de-datos)
+- [Autenticación y roles](#autenticación-y-roles)
+- [Referencia de la API](#referencia-de-la-api)
 - [Reglas de negocio](#reglas-de-negocio)
-- [Endpoints implementados](#endpoints-implementados)
 - [Formato de errores](#formato-de-errores)
-- [Ejemplos de uso](#ejemplos-de-uso)
-- [Flujo de trabajo Git](#flujo-de-trabajo-git)
-- [Convención de commits](#convención-de-commits)
-- [Estado del desarrollo](#estado-del-desarrollo)
+- [Datos de prueba](#datos-de-prueba)
+- [Escenarios de uso](#escenarios-de-uso)
 
 ---
 
@@ -28,58 +28,100 @@ API REST para la gestión de exposiciones académicas con coevaluación entre al
 
 | Tecnología | Versión | Rol |
 |---|---|---|
-| Node.js | 20 LTS | Runtime |
+| Node.js | 18+ LTS | Runtime |
 | Express | 5.x | Framework HTTP |
 | Supabase JS Client | 2.x | Acceso a base de datos (PostgreSQL) |
 | jsonwebtoken | 9.x | Emisión y verificación de JWT |
-| bcrypt | 5.x | Hash de contraseñas |
-| Zod | 4.x | Validación de esquemas |
-| dotenv | 16.x | Variables de entorno |
-| nodemon | 3.x | Recarga en desarrollo |
+| bcrypt | 6.x | Hash de contraseñas |
+| Zod | 4.x | Validación de esquemas en controllers |
+| dotenv | 17.x | Variables de entorno |
+| nodemon | 3.x | Recarga automática en desarrollo |
+| **Next.js** | **14.x** | **Frontend (Pages Router)** |
+| **React** | **18.x** | **UI del frontend** |
+| **Axios** | **1.x** | **Cliente HTTP en el frontend** |
+
+---
+
+## Arquitectura
+
+```
+exposiciones-backend/   → API REST · Express.js + Supabase  (puerto 3000)
+exposiciones-frontend/  → Interfaz web · Next.js 14          (puerto 3001)
+```
+
+```
+[Navegador :3001]
+      │
+      │  /api/v1/*  (proxy Next.js)
+      ▼
+[Express API :3000]
+      │
+      │  Supabase JS Client
+      ▼
+[Supabase · PostgreSQL · cloud]
+```
+
+**Flujo de autenticación:**
+1. Frontend envía `POST /api/v1/auth/login` con `{ username, password }`.
+2. Backend verifica contra Supabase y responde con un JWT firmado.
+3. Frontend almacena el token en `localStorage` y lo adjunta en cada petición como `Authorization: Bearer <token>`.
+
+Cada módulo del backend sigue la misma estructura interna:
+
+```
+routes.js      → rutas + middlewares de auth/rol
+controller.js  → validación Zod, mapeo HTTP ↔ servicio
+service.js     → lógica de negocio + consultas Supabase
+```
 
 ---
 
 ## Requisitos previos
 
-- Node.js 20 LTS
-- Proyecto activo en [Supabase](https://supabase.com) con las tablas creadas
-- (Opcional) Cuenta en [Vercel](https://vercel.com) para despliegue
+- Node.js ≥ 18
+- npm ≥ 9
+- Proyecto activo en [Supabase](https://supabase.com) con el esquema de tablas creado
+- Variables de entorno configuradas (ver sección siguiente)
 
 ---
 
 ## Instalación y configuración
 
+### Backend
+
 ```bash
-# 1. Clonar el repositorio
 git clone https://github.com/DoctourDot18Pup/exposiciones-backend.git
 cd exposiciones-backend
-
-# 2. Instalar dependencias
 npm install
+cp .env.example .env   # completar con valores reales
+npm run dev            # desarrollo (nodemon)
+npm start              # producción
+```
 
-# 3. Configurar variables de entorno
-cp .env.example .env
-# Editar .env con los valores reales
+### Frontend
 
-# 4. Iniciar en modo desarrollo
-npm run dev
-
-# 5. Iniciar en producción
-npm start
+```bash
+cd exposiciones-frontend
+npm install
+npm run dev            # http://localhost:3001
 ```
 
 ---
 
 ## Variables de entorno
 
+Archivo `.env` en la raíz de `exposiciones-backend/`:
+
 | Variable | Descripción | Ejemplo |
 |---|---|---|
 | `PORT` | Puerto del servidor | `3000` |
-| `SUPABASE_URL` | URL del proyecto en Supabase | `https://xxxx.supabase.co` |
-| `SUPABASE_KEY` | Clave anon/service de Supabase | `eyJhbGci...` |
-| `JWT_SECRET` | Secreto para firmar los tokens JWT | Cadena aleatoria larga |
-| `JWT_EXPIRES_IN` | Duración del token en segundos | `7200` (2 horas) |
-| `INSTITUTIONAL_DOMAIN` | Dominio para generar usernames de alumnos | `itcelaya.edu.mx` |
+| `SUPABASE_URL` | URL del proyecto Supabase | `https://xxxx.supabase.co` |
+| `SUPABASE_KEY` | Clave **service_role** de Supabase | `eyJhbGci...` |
+| `JWT_SECRET` | Cadena secreta para firmar JWT | Cadena aleatoria larga |
+| `JWT_EXPIRES_IN` | Duración del token en segundos | `7200` |
+| `INSTITUTIONAL_DOMAIN` | Dominio para usernames de alumnos | `itcelaya.edu.mx` |
+
+> Usa la clave `service_role` (nunca la `anon`) para que el backend opere con permisos completos. No la expongas en el frontend ni en repositorios públicos.
 
 ---
 
@@ -87,8 +129,6 @@ npm start
 
 ```
 exposiciones-backend/
-├── docs/
-│   └── EXAMPLES.md                      # Ejemplos completos de uso por módulo
 ├── src/
 │   ├── config/
 │   │   └── supabase.js                  # Inicialización del cliente Supabase
@@ -97,212 +137,65 @@ exposiciones-backend/
 │   │   └── errorHandler.middleware.js   # Formato estándar de errores
 │   └── modules/
 │       ├── auth/                         # M01 — Login
-│       │   ├── auth.routes.js
-│       │   ├── auth.controller.js
-│       │   └── auth.service.js
 │       ├── materias/                     # M02 — CRUD materias
-│       │   ├── materias.routes.js
-│       │   ├── materias.controller.js
-│       │   └── materias.service.js
-│       ├── rubricas/                     # M03 — CRUD rúbricas y criterios
-│       │   ├── rubricas.routes.js
-│       │   ├── rubricas.controller.js
-│       │   └── rubricas.service.js
-│       ├── grupos/                       # M04 — CRUD grupos
-│       │   ├── grupos.routes.js
-│       │   ├── grupos.controller.js
-│       │   └── grupos.service.js
-│       ├── alumnos/                      # M05 — Registro de alumnos (RN11)
-│       │   ├── alumnos.routes.js
-│       │   ├── alumnos.controller.js
-│       │   └── alumnos.service.js
-│       ├── equipos/                      # M06 — CRUD equipos
-│       │   ├── equipos.routes.js
-│       │   ├── equipos.controller.js
-│       │   └── equipos.service.js
+│       ├── grupos/                       # M03 — CRUD grupos
+│       ├── alumnos/                      # M04 — Registro de alumnos
+│       ├── equipos/                      # M05 — CRUD equipos
+│       ├── rubricas/                     # M06 — CRUD rúbricas y criterios
 │       ├── exposiciones/                 # M07 — Gestión de exposiciones
-│       │   ├── exposiciones.routes.js
-│       │   ├── exposiciones.controller.js
-│       │   └── exposiciones.service.js
 │       ├── permisos/                     # M08 — Permisos de evaluación
-│       │   ├── permisos.routes.js
-│       │   ├── permisos.controller.js
-│       │   └── permisos.service.js
-│       └── evaluaciones/                # M09 — Registro y consulta de evaluaciones
-│           ├── evaluaciones.routes.js
-│           ├── evaluaciones.controller.js
-│           └── evaluaciones.service.js
-├── app.js                               # Configuración de Express y registro de rutas
+│       └── evaluaciones/                # M09 — Coevaluación
+├── datos_prueba.sql                     # Script idempotente con datos de prueba
 ├── index.js                             # Entrada del servidor
-├── .env                                 # Variables de entorno (no versionado)
-├── .env.example                         # Plantilla de variables
-├── vercel.json                          # Configuración de despliegue
+├── .env.example
 └── package.json
-```
-
-Cada módulo sigue la misma estructura interna:
-
-```
-routes.js      → Define las rutas y aplica middlewares de autenticación/rol
-controller.js  → Valida el input con Zod y delega al servicio
-service.js     → Contiene la lógica de negocio y acceso a Supabase
 ```
 
 ---
 
-## Diseño de base de datos
+## Base de datos
 
 ### Diagrama de dependencias
 
 ```
 USUARIOS
    │
-   ├──► ALUMNOS ──► GRUPOS ──► MATERIAS
-   │         │                    │
-   │         └──► EQUIPOS         └──► RUBRICAS ──► CRITERIOS
-   │                  │
-   │                  └──► EXPOSICIONES
-   │                             │
+   ├──► ALUMNOS ──► GRUPOS ──► MATERIAS ──► RUBRICAS ──► CRITERIOS
+   │         │
+   │         └──► EQUIPOS ──► EXPOSICIONES
+   │                               │
    │                    PERMISOS_EVALUACION
-   │                             │
-   └──────────────────► EVALUACIONES ──► DETALLE_EVALUACION
+   │                               │
+   └────────────────────► EVALUACIONES ──► DETALLE_EVALUACION
 ```
 
 ### Tablas
 
-#### `usuarios`
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id_usuario` | integer PK | Identificador único |
-| `username` | varchar | Correo institucional (único) |
-| `password_hash` | varchar | Hash bcrypt de la contraseña |
-| `rol` | varchar | `'docente'` o `'alumno'` |
+| Tabla | Columnas clave | Descripción |
+|-------|---------------|-------------|
+| `usuarios` | `id_usuario`, `username`, `password_hash`, `rol` | Cuentas con rol `docente` o `alumno` |
+| `materias` | `id_materia`, `clave_materia`, `nombre_materia` | Asignaturas |
+| `grupos` | `id_grupo`, `id_materia`, `nombre_grupo` | Grupos escolares |
+| `alumnos` | `id_alumno`, `id_usuario`, `id_grupo`, `id_equipo`, `nombre`, `apellido`, `matricula` | Perfil del alumno |
+| `equipos` | `id_equipo`, `id_grupo`, `nombre_equipo` | Equipos de trabajo |
+| `exposiciones` | `id_exposicion`, `id_equipo`, `tema`, `fecha`, `estado`, `minutos_ventana` | Exposiciones; estado: `pendiente / activa / cerrada` |
+| `rubricas` | `id_rubrica`, `id_materia`, `nombre` | Rúbricas por materia |
+| `criterios` | `id_criterio`, `id_rubrica`, `descripcion`, `ponderacion` | Criterios con ponderación (%) |
+| `permisos_evaluacion` | `id_permiso`, `id_alumno`, `id_exposicion`, `habilitado`, `fecha_apertura`, `fecha_cierre`, `evaluado` | Permiso individual alumno ↔ exposición |
+| `evaluaciones` | `id_evaluacion`, `id_exposicion`, `id_alumno`, `promedio`, `fecha_evaluacion` | Evaluación completa |
+| `detalle_evaluacion` | `id_detalle`, `id_evaluacion`, `id_criterio`, `calificacion` | Calificación por criterio |
 
-#### `materias`
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id_materia` | integer PK | Identificador único |
-| `clave_materia` | varchar | Clave única (ej. `TADW-01`) |
-| `nombre_materia` | varchar | Nombre descriptivo |
-
-#### `rubricas`
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id_rubrica` | integer PK | Identificador único |
-| `id_materia` | integer FK | Materia a la que pertenece |
-| `nombre` | varchar | Nombre de la rúbrica |
-
-#### `criterios`
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id_criterio` | integer PK | Identificador único |
-| `id_rubrica` | integer FK | Rúbrica a la que pertenece |
-| `descripcion` | varchar | Descripción del criterio |
-| `ponderacion` | decimal | Peso del criterio |
-
-#### `grupos`
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id_grupo` | integer PK | Identificador único |
-| `id_materia` | integer FK | Materia a la que pertenece |
-| `nombre_grupo` | varchar | Nombre del grupo (ej. `Grupo 7A`) |
-
-#### `equipos`
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id_equipo` | integer PK | Identificador único |
-| `id_grupo` | integer FK | Grupo al que pertenece |
-| `nombre_equipo` | varchar | Nombre del equipo |
-
-#### `alumnos`
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id_alumno` | integer PK | Identificador único |
-| `id_usuario` | integer FK | Usuario asociado en `usuarios` |
-| `id_grupo` | integer FK | Grupo al que pertenece |
-| `id_equipo` | integer FK nullable | Equipo asignado (puede ser null) |
-| `nombre` | varchar | Nombre del alumno |
-| `apellido` | varchar | Apellido(s) del alumno |
-| `matricula` | varchar | Número de matrícula (único) |
-
-#### `exposiciones`
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id_exposicion` | integer PK | Identificador único |
-| `id_equipo` | integer FK | Equipo expositor |
-| `tema` | varchar | Tema de la exposición |
-| `fecha` | date | Fecha programada |
-| `estado` | varchar | `'pendiente'`, `'activa'` o `'cerrada'` |
-| `minutos_ventana` | integer | Duración de la ventana: `10` o `15` minutos |
-
-#### `permisos_evaluacion`
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id_permiso` | integer PK | Identificador único |
-| `id_alumno` | integer FK | Alumno habilitado para evaluar |
-| `id_exposicion` | integer FK | Exposición a evaluar |
-| `habilitado` | boolean | Si el permiso está activo |
-| `fecha_apertura` | timestamp | Momento en que se habilitó |
-| `fecha_cierre` | timestamp | Momento en que expira la ventana |
-| `evaluado` | boolean | Si el alumno ya evaluó |
-
-#### `evaluaciones`
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id_evaluacion` | integer PK | Identificador único |
-| `id_exposicion` | integer FK | Exposición evaluada |
-| `id_alumno` | integer FK | Alumno que evaluó |
-| `fecha_evaluacion` | timestamp | Momento del registro |
-| `promedio` | decimal | Promedio ponderado calculado por el backend |
-
-#### `detalle_evaluacion`
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id_detalle` | integer PK | Identificador único |
-| `id_evaluacion` | integer FK | Evaluación a la que pertenece |
-| `id_criterio` | integer FK | Criterio evaluado |
-| `calificacion` | decimal | Calificación asignada (0.0 – 10.0) |
+**Nota sobre `fecha_cierre`:** cuando el docente **reabre** un permiso para un alumno, se establece `fecha_cierre = '2099-12-31T23:59:59Z'` como centinela de "sin restricción de tiempo".
 
 ---
 
-## Arquitectura de módulos
+## Autenticación y roles
 
-### Flujo de una petición
+El único endpoint público es `POST /api/v1/auth/login`. Todos los demás requieren:
 
 ```
-Cliente HTTP
-    │
-    ▼
-Express Router (routes.js)
-    │  └─ apply: authenticate, requireRole
-    ▼
-Controller (controller.js)
-    │  └─ validate: Zod schema
-    ▼
-Service (service.js)
-    │  └─ business logic + Supabase queries
-    ▼
-Supabase (PostgreSQL)
+Authorization: Bearer <token>
 ```
-
-### Middlewares globales
-
-**`authenticate`** — verifica el Bearer token en cada ruta protegida:
-1. Extrae el token del header `Authorization: Bearer <token>`
-2. Verifica la firma con `JWT_SECRET`
-3. Adjunta el payload a `req.user` (`{ id_usuario, username, rol }`)
-4. Responde `401` si el token es inválido o ha expirado
-
-**`requireRole(rol)`** — restringe acceso por rol:
-- Responde `403` si `req.user.rol` no coincide con el rol requerido
-
-**`errorHandler`** — captura todos los errores no controlados y los formatea con la estructura estándar.
-
----
-
-## Autenticación
-
-El sistema usa **JWT (JSON Web Tokens)**. El único endpoint público es `POST /api/v1/auth/login`.
 
 ### Obtener token
 
@@ -311,272 +204,454 @@ POST /api/v1/auth/login
 Content-Type: application/json
 
 {
-  "username": "docente@itcelaya.edu.mx",
-  "password": "mipassword"
+  "username": "21031401@itcelaya.edu.mx",
+  "password": "alumnos"
 }
 ```
 
-**Respuesta exitosa (200):**
+**Respuesta 200:**
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  "token": "eyJhbGci...",
+  "usuario": { "id_usuario": 5, "nombre": "Ana", "rol": "alumno" }
 }
 ```
 
-### Usar el token
+### Roles
 
-Incluir en todas las peticiones protegidas:
+| Rol | Descripción |
+|-----|-------------|
+| `docente` | CRUD completo en catálogos, gestión de exposiciones, consulta de resultados |
+| `alumno` | Consulta de exposiciones activas propias y registro de evaluaciones |
+
+---
+
+## Referencia de la API
+
+**Base URL:** `http://localhost:3000/api/v1`
+
+---
+
+### Auth
+
+| Método | Ruta | Auth | Rol | Descripción |
+|--------|------|------|-----|-------------|
+| POST | `/auth/login` | No | — | Iniciar sesión |
+
+---
+
+### Materias
+
+| Método | Ruta | Auth | Rol | Descripción |
+|--------|------|------|-----|-------------|
+| GET | `/materias` | Sí | cualquiera | Listar (`?page=0&size=10`) |
+| POST | `/materias` | Sí | docente | Crear |
+| GET | `/materias/:id` | Sí | cualquiera | Obtener por ID |
+| PUT | `/materias/:id` | Sí | docente | Actualizar |
+| DELETE | `/materias/:id` | Sí | docente | Eliminar |
+
+---
+
+### Grupos
+
+| Método | Ruta | Auth | Rol | Descripción |
+|--------|------|------|-----|-------------|
+| GET | `/grupos` | Sí | cualquiera | Listar |
+| POST | `/grupos` | Sí | docente | Crear |
+| GET | `/grupos/:id` | Sí | cualquiera | Obtener por ID |
+| PUT | `/grupos/:id` | Sí | docente | Actualizar |
+| DELETE | `/grupos/:id` | Sí | docente | Eliminar |
+
+---
+
+### Alumnos
+
+| Método | Ruta | Auth | Rol | Descripción |
+|--------|------|------|-----|-------------|
+| GET | `/alumnos` | Sí | cualquiera | Listar |
+| POST | `/alumnos` | Sí | docente | Registrar alumno |
+| GET | `/alumnos/:id` | Sí | cualquiera | Obtener por ID |
+| PUT | `/alumnos/:id` | Sí | docente | Actualizar |
+| DELETE | `/alumnos/:id` | Sí | docente | Eliminar |
+
+---
+
+### Equipos
+
+| Método | Ruta | Auth | Rol | Descripción |
+|--------|------|------|-----|-------------|
+| GET | `/equipos` | Sí | cualquiera | Listar |
+| POST | `/equipos` | Sí | docente | Crear |
+| GET | `/equipos/:id` | Sí | cualquiera | Obtener por ID |
+| PUT | `/equipos/:id` | Sí | docente | Actualizar |
+| DELETE | `/equipos/:id` | Sí | docente | Eliminar |
+
+---
+
+### Rúbricas y Criterios
+
+| Método | Ruta | Auth | Rol | Descripción |
+|--------|------|------|-----|-------------|
+| GET | `/rubricas` | Sí | cualquiera | Listar |
+| POST | `/rubricas` | Sí | docente | Crear |
+| GET | `/rubricas/:id` | Sí | cualquiera | Obtener por ID |
+| PUT | `/rubricas/:id` | Sí | docente | Actualizar |
+| DELETE | `/rubricas/:id` | Sí | docente | Eliminar |
+| GET | `/rubricas/:id/criterios` | Sí | cualquiera | Listar criterios de la rúbrica |
+| POST | `/rubricas/:id/criterios` | Sí | docente | Agregar criterio |
+| GET | `/criterios/:id` | Sí | cualquiera | Obtener criterio por ID |
+| PUT | `/criterios/:id` | Sí | docente | Actualizar criterio |
+| DELETE | `/criterios/:id` | Sí | docente | Eliminar criterio |
+
+---
+
+### Exposiciones
+
+| Método | Ruta | Auth | Rol | Descripción |
+|--------|------|------|-----|-------------|
+| GET | `/exposiciones` | Sí | cualquiera | Listar. Docente: todas. Alumno: solo activas con permiso habilitado (incluye `_evaluado`) |
+| POST | `/exposiciones` | Sí | docente | Crear en estado `pendiente` |
+| GET | `/exposiciones/:id` | Sí | cualquiera | Obtener por ID |
+| PUT | `/exposiciones/:id` | Sí | docente | Actualizar (solo estado `pendiente`) |
+| DELETE | `/exposiciones/:id` | Sí | docente | Eliminar (solo estado `pendiente`) |
+| PATCH | `/exposiciones/:id/habilitar` | Sí | docente | Habilitar: genera permisos y cambia estado a `activa` |
+| PATCH | `/exposiciones/:id/cerrar` | Sí | docente | Cerrar con contraseña |
+
+**Body `/habilitar`:**
+```json
+{ "minutos_ventana": 10 }
 ```
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Valores válidos: `10` o `15`.
+
+**Body `/cerrar`:**
+```json
+{ "metodo": "password", "password_confirmacion": "docente" }
 ```
 
-### Payload del JWT
+**Campo `_evaluado` (solo alumnos):** `true` si el alumno ya registró su evaluación para esa exposición. Usado por el frontend para mostrar el badge *Evaluada* en lugar del botón *Evaluar →*.
 
+---
+
+### Permisos de evaluación
+
+| Método | Ruta | Auth | Rol | Descripción |
+|--------|------|------|-----|-------------|
+| GET | `/permisos/exposicion/:id_exposicion` | Sí | docente | Listar permisos de todos los alumnos para una exposición |
+| PATCH | `/permisos/:id/reabrir` | Sí | docente | Reabrir permiso de un alumno (sin restricción de tiempo, RN09.3) |
+
+Reabrir falla con `409` si el alumno ya evaluó (RN01).
+
+---
+
+### Evaluaciones
+
+| Método | Ruta | Auth | Rol | Descripción |
+|--------|------|------|-----|-------------|
+| POST | `/evaluaciones` | Sí | alumno | Registrar evaluación |
+| GET | `/evaluaciones/:id` | Sí | cualquiera | Obtener por ID |
+| GET | `/evaluaciones/exposicion/:id_exposicion` | Sí | docente | Resultados + criterios + detalles de una exposición |
+
+**Body POST `/evaluaciones`:**
 ```json
 {
-  "id_usuario": 1,
-  "username": "docente@itcelaya.edu.mx",
-  "rol": "docente",
-  "iat": 1746835200,
-  "exp": 1746842400
+  "id_exposicion": 3,
+  "detalles": [
+    { "id_criterio": 1, "calificacion": 9.0 },
+    { "id_criterio": 2, "calificacion": 8.5 },
+    { "id_criterio": 3, "calificacion": 8.0 },
+    { "id_criterio": 4, "calificacion": 7.5 }
+  ]
 }
 ```
 
-### Roles disponibles
-
-| Rol | Descripción | Acceso |
-|---|---|---|
-| `docente` | Profesor titular | CRUD completo en recursos de configuración, gestión de exposiciones y consulta de resultados |
-| `alumno` | Estudiante | Consulta de exposiciones activas de su grupo y registro de evaluaciones |
+**Respuesta GET `/evaluaciones/exposicion/:id`:**
+```json
+{
+  "id_exposicion": 3,
+  "evaluaciones": [
+    {
+      "id_evaluacion": 1,
+      "id_alumno": 3,
+      "promedio": 8.38,
+      "detalles": [
+        { "id_criterio": 1, "calificacion": 9.0 }
+      ]
+    }
+  ],
+  "criterios": {
+    "1": { "descripcion": "Dominio del tema", "ponderacion": 30 },
+    "2": { "descripcion": "Claridad y estructura", "ponderacion": 25 }
+  },
+  "promedio_general": 8.38
+}
+```
 
 ---
 
 ## Reglas de negocio
 
 | ID | Regla |
-|---|---|
-| **RN01** | Un alumno no puede evaluar la misma exposición dos veces. |
-| **RN02** | Las calificaciones deben estar en el rango 0.0 a 10.0. |
-| **RN03** | Toda evaluación debe incluir todos los criterios de la rúbrica, sin excepción. |
-| **RN04** | No pueden existir dos materias con la misma `clave_materia`. |
-| **RN05** | Solo usuarios autenticados acceden a recursos protegidos. El único endpoint público es `POST /auth/login`. |
-| **RN06** | Los criterios de evaluación son predefinidos por el docente antes de habilitar una exposición. |
-| **RN07** | Los recursos inexistentes siempre retornan HTTP 404. |
-| **RN08** | Un alumno no puede evaluar la exposición de su propio equipo. El alumno solo ve exposiciones de otros equipos de su grupo. |
-| **RN09** | Una exposición es evaluable únicamente dentro de la ventana de tiempo activa y el mismo día calendario en que fue habilitada. Las validaciones se ejecutan en este orden estricto: (1) token válido, (2) registro de alumno, (3) permiso existente, (4) permiso habilitado, (5) mismo día calendario, (6) dentro de la ventana de tiempo, (7) no ha evaluado ya, (8) no pertenece al equipo expositor, (9) criterios válidos y calificaciones en rango. |
-| **RN09.3** | El docente puede rehabilitar la ventana de evaluación para un alumno específico, siempre que ese alumno no haya evaluado aún. |
-| **RN10** | El docente ve el desglose completo con evaluaciones individuales y sus detalles. |
-| **RN11** | Las credenciales de los alumnos se generan automáticamente al registrarlos: `username = {4 primeras letras del apellido}{4 últimos dígitos de matrícula}@{INSTITUTIONAL_DOMAIN}` y `password_temporal = {4 primeras letras del apellido}{4 últimos dígitos de matrícula}`. Las credenciales se exponen únicamente en la respuesta de creación (HTTP 201). |
-| **RN12** | El promedio ponderado se calcula en el backend al registrar la evaluación. Fórmula: `SUM(calificacion × ponderacion) / SUM(ponderacion)`. |
-| **RN13** | El cierre manual de una exposición requiere confirmación del docente: mediante contraseña (validada con bcrypt en el backend) o captcha (validado en el frontend; el backend acepta la solicitud sin verificación adicional). |
-
----
-
-## Endpoints implementados
-
-Base URL: `http://localhost:3000/api/v1`
-
-### Auth
-
-| Método | Ruta | Auth | Rol | Descripción |
-|---|---|---|---|---|
-| POST | `/auth/login` | No | — | Autenticar usuario y obtener JWT |
-
-### Materias
-
-| Método | Ruta | Auth | Rol | Descripción |
-|---|---|---|---|---|
-| GET | `/materias` | Sí | Cualquiera | Listar materias (paginado) |
-| POST | `/materias` | Sí | Docente | Crear materia |
-| GET | `/materias/:id` | Sí | Cualquiera | Obtener materia por ID |
-| PUT | `/materias/:id` | Sí | Docente | Actualizar materia |
-| DELETE | `/materias/:id` | Sí | Docente | Eliminar materia |
-
-### Rúbricas y Criterios
-
-| Método | Ruta | Auth | Rol | Descripción |
-|---|---|---|---|---|
-| GET | `/rubricas` | Sí | Cualquiera | Listar rúbricas (paginado) |
-| POST | `/rubricas` | Sí | Docente | Crear rúbrica vinculada a una materia |
-| GET | `/rubricas/:id` | Sí | Cualquiera | Obtener rúbrica por ID |
-| PUT | `/rubricas/:id` | Sí | Docente | Actualizar rúbrica |
-| DELETE | `/rubricas/:id` | Sí | Docente | Eliminar rúbrica |
-| GET | `/criterios/rubrica/:id` | Sí | Cualquiera | Listar criterios de una rúbrica |
-| POST | `/criterios/rubrica/:id` | Sí | Docente | Agregar criterio a una rúbrica |
-| GET | `/criterios/:id` | Sí | Cualquiera | Obtener criterio por ID |
-| PUT | `/criterios/:id` | Sí | Docente | Actualizar criterio |
-| DELETE | `/criterios/:id` | Sí | Docente | Eliminar criterio |
-
-### Grupos
-
-| Método | Ruta | Auth | Rol | Descripción |
-|---|---|---|---|---|
-| GET | `/grupos` | Sí | Cualquiera | Listar grupos (paginado) |
-| POST | `/grupos` | Sí | Docente | Crear grupo vinculado a una materia |
-| GET | `/grupos/:id` | Sí | Cualquiera | Obtener grupo por ID |
-| PUT | `/grupos/:id` | Sí | Docente | Actualizar grupo |
-| DELETE | `/grupos/:id` | Sí | Docente | Eliminar grupo |
-
-### Alumnos
-
-| Método | Ruta | Auth | Rol | Descripción |
-|---|---|---|---|---|
-| GET | `/alumnos` | Sí | Cualquiera | Listar alumnos (paginado) |
-| POST | `/alumnos` | Sí | Docente | Registrar alumno (genera credenciales — RN11) |
-| GET | `/alumnos/:id` | Sí | Cualquiera | Obtener alumno por ID |
-| PUT | `/alumnos/:id` | Sí | Docente | Actualizar datos del alumno |
-| DELETE | `/alumnos/:id` | Sí | Docente | Eliminar alumno y su usuario asociado |
-
-### Equipos
-
-| Método | Ruta | Auth | Rol | Descripción |
-|---|---|---|---|---|
-| GET | `/equipos` | Sí | Docente | Listar equipos (paginado) |
-| POST | `/equipos` | Sí | Docente | Crear equipo vinculado a un grupo |
-| GET | `/equipos/:id` | Sí | Docente | Obtener equipo por ID |
-| PUT | `/equipos/:id` | Sí | Docente | Actualizar equipo |
-| DELETE | `/equipos/:id` | Sí | Docente | Eliminar equipo |
-
-### Exposiciones
-
-| Método | Ruta | Auth | Rol | Descripción |
-|---|---|---|---|---|
-| GET | `/exposiciones` | Sí | Cualquiera | Listar exposiciones — docente ve todas; alumno ve solo activas de otros equipos de su grupo (RN08) |
-| POST | `/exposiciones` | Sí | Docente | Crear exposición en estado `pendiente` |
-| GET | `/exposiciones/:id` | Sí | Cualquiera | Obtener exposición por ID |
-| PUT | `/exposiciones/:id` | Sí | Docente | Actualizar exposición (solo estado `pendiente`) |
-| DELETE | `/exposiciones/:id` | Sí | Docente | Eliminar exposición (solo estado `pendiente`) |
-| POST | `/exposiciones/:id/habilitar` | Sí | Docente | Habilitar exposición: cambia estado a `activa` y genera permisos para el grupo (RN08) |
-| POST | `/exposiciones/:id/cerrar` | Sí | Docente | Cerrar exposición con confirmación por password o captcha (RN13) |
-
-### Permisos de Evaluación
-
-| Método | Ruta | Auth | Rol | Descripción |
-|---|---|---|---|---|
-| GET | `/permisos/exposicion/:id` | Sí | Docente | Listar permisos de una exposición con su estado actual |
-| PATCH | `/permisos/:id/reabrir` | Sí | Docente | Reabrir ventana de evaluación para un alumno que no ha evaluado (RN09.3) |
-
-### Evaluaciones
-
-| Método | Ruta | Auth | Rol | Descripción |
-|---|---|---|---|---|
-| POST | `/evaluaciones` | Sí | Alumno | Registrar evaluación con validaciones RN09 en orden estricto |
-| GET | `/evaluaciones/exposicion/:id` | Sí | Docente | Consultar resultados de una exposición con detalles y promedio general |
-| GET | `/evaluaciones/:id` | Sí | Cualquiera | Obtener evaluación por ID |
+|----|-------|
+| RN01 | Un permiso no puede reabrirse si el alumno ya evaluó |
+| RN02 | Las calificaciones deben estar en el rango [0.0, 10.0] |
+| RN03 | Toda evaluación debe incluir exactamente todos los criterios de la rúbrica |
+| RN05 | Solo usuarios autenticados acceden a recursos protegidos |
+| RN07 | Los recursos inexistentes retornan HTTP 404 |
+| RN08 | Los integrantes del equipo expositor no reciben permiso de evaluación |
+| RN09 | Una evaluación es válida si, en este orden estricto: (1) token válido, (2) alumno registrado, (3) permiso existente, (4) permiso habilitado, (5) ventana no expirada (omitido si docente reabrió), (6) no ha evaluado ya, (7) no pertenece al equipo expositor, (8) criterios y calificaciones válidos |
+| RN09.3 | El docente puede reabrir la ventana de un alumno mientras no haya evaluado; sin restricción de tiempo |
+| RN12 | Promedio ponderado: `Σ(calificacion × ponderacion) / Σ(ponderacion)` |
+| RN13 | El cierre de una exposición requiere confirmación por contraseña del docente |
 
 ---
 
 ## Formato de errores
 
-Todos los errores del sistema responden con la siguiente estructura:
-
 ```json
 {
-  "timestamp": "2026-05-10T10:00:00.000Z",
-  "status": 404,
-  "error": "Not Found",
-  "message": "El recurso solicitado no existe",
-  "path": "/api/v1/materias/99"
+  "timestamp": "2026-05-12T23:00:00.000Z",
+  "status": 403,
+  "error": "Forbidden",
+  "message": "No tienes permiso para evaluar esta exposicion",
+  "path": "/api/v1/evaluaciones"
 }
 ```
 
-| Campo | Descripción |
-|---|---|
-| `timestamp` | Fecha y hora del error en formato ISO 8601 |
-| `status` | Código HTTP del error |
-| `error` | Nombre estándar del código HTTP |
-| `message` | Mensaje descriptivo del error |
-| `path` | Ruta que generó el error |
-
-### Códigos de error utilizados
-
-| Código | Significado | Cuándo ocurre |
-|---|---|---|
-| `400` | Bad Request | Datos inválidos, campo faltante, ID de recurso relacionado inexistente, criterios incorrectos |
-| `401` | Unauthorized | Token ausente, inválido o expirado |
-| `403` | Forbidden | Rol insuficiente, operación no permitida por el estado actual del recurso, o violación de regla de negocio de acceso |
-| `404` | Not Found | Recurso inexistente (RN07) |
-| `409` | Conflict | Duplicado (matrícula, clave de materia) o evaluación repetida (RN01) |
-| `500` | Internal Server Error | Error inesperado del servidor o de Supabase |
+| Código | Cuándo ocurre |
+|--------|--------------|
+| 400 | Datos inválidos, campo faltante, criterios incorrectos |
+| 401 | Token ausente, inválido o expirado |
+| 403 | Rol insuficiente o violación de regla de negocio |
+| 404 | Recurso inexistente |
+| 409 | Duplicado o evaluación repetida |
+| 500 | Error inesperado del servidor |
 
 ---
 
-## Ejemplos de uso
+## Datos de prueba
 
-Ver el archivo [docs/EXAMPLES.md](docs/EXAMPLES.md) para ejemplos detallados de petición y respuesta de todos los módulos, incluyendo:
+Ejecuta `datos_prueba.sql` en el **SQL Editor** de tu proyecto Supabase. El script comienza con un bloque `DELETE` que limpia datos anteriores — es completamente **idempotente**.
 
-- Flujo completo de extremo a extremo (16 pasos)
-- Casos de error por módulo con respuestas exactas
-- Tabla de generación de credenciales (RN11)
-- Cálculo del promedio ponderado (RN12)
+```
+Docentes (usuario / contraseña):
+  mgarcia@itcelaya.edu.mx   / docente
+  cmendoza@itcelaya.edu.mx  / docente
+
+Alumnos (matricula@itcelaya.edu.mx / alumnos):
+  21031401–04  → 4°A BDA   (Equipo Alpha: 01-02 · Equipo Beta: 03-04)
+  21031405–08  → 4°B BDA   (Equipo Delta: 05-06 · Equipo Gamma: 07-08)
+  21031409–12  → 4°A POO   (Equipo Lambda: 09-10 · Equipo Sigma: 11-12)
+  21031413–16  → 5°A Redes (Equipo Omega: 13-14 · Equipo Theta: 15-16)
+```
+
+| Recurso | Cantidad | Detalle |
+|---------|----------|---------|
+| Materias | 3 | BDA, POO, Redes |
+| Grupos | 4 | 4°A BDA, 4°B BDA, 4°A POO, 5°A Redes |
+| Docentes | 2 | mgarcia, cmendoza |
+| Alumnos | 16 | 4 por grupo, matrícula 21031401–16 |
+| Equipos | 8 | 2 por grupo |
+| Exposiciones | 6 | Estado `pendiente` — habilitar desde la UI |
+| Rúbricas | 3 | Una por materia |
+| Criterios | 12 | 4 por rúbrica (ponderaciones suman 100%) |
 
 ---
 
-## Flujo de trabajo Git
+## Escenarios de uso
 
-```
-main          ← rama de producción
-  └── develop ← rama de integración
-        ├── feature/m01-auth
-        ├── feature/m02-materias
-        ├── feature/m03-rubricas
-        ├── feature/m04-grupos
-        ├── feature/m05-alumnos
-        ├── feature/m06-equipos
-        ├── feature/m07-exposiciones
-        ├── feature/m08-permisos
-        └── feature/m09-evaluaciones
-```
-
-**Regla:** cada módulo se desarrolla en su propia rama `feature/mXX-nombre`, partiendo de la rama del módulo anterior (por dependencia de código). Los PRs apuntan a `develop`. Una vez validados todos los módulos, `develop` se fusiona en `main`.
+Los escenarios siguientes describen flujos completos de extremo a extremo. Los actores son un **Docente** (`mgarcia`) y alumnos del grupo **4°A POO** (Equipo Lambda: 21031409, 21031410 · Equipo Sigma: 21031411, 21031412).
 
 ---
 
-## Convención de commits
+### Escenario 1 · Configuración inicial del ciclo
 
-```
-<tipo>(<módulo>): <descripción imperativa en español>
-```
+**Actor:** Docente  
+**Objetivo:** Preparar el sistema antes del primer día de exposiciones
 
-| Tipo | Cuándo usarlo |
-|---|---|
-| `feat` | Nueva funcionalidad |
-| `fix` | Corrección de un error |
-| `chore` | Tareas de mantenimiento, configuración |
-| `docs` | Cambios en documentación |
-| `refactor` | Cambios de código sin cambiar comportamiento |
+1. Iniciar sesión como `mgarcia@itcelaya.edu.mx` / `docente`.
+2. Ir a **Materias** → verificar que `Programación Orientada a Objetos` existe.
+3. Ir a **Grupos** → verificar que `4°A - POO` está vinculado a esa materia.
+4. Ir a **Alumnos** → verificar que los 4 alumnos del grupo tienen equipo asignado.
+5. Ir a **Rúbricas** → verificar que la rúbrica de POO tiene 4 criterios con ponderaciones que suman 100%:
+   - Comprensión de conceptos OO: 35%
+   - Calidad del código: 30%
+   - Respuesta a preguntas: 20%
+   - Recursos visuales: 15%
 
-**Ejemplo:**
-```
-feat(alumnos): implementar registro con generacion automatica de credenciales (RN11)
-```
+**Resultado esperado:** El sistema está listo para programar exposiciones del grupo.
 
 ---
 
-## Estado del desarrollo
+### Escenario 2 · Programar una exposición
 
-### Módulos completados — Roberto Gómez
+**Actor:** Docente  
+**Objetivo:** Registrar la exposición del Equipo Sigma
 
-| # | Módulo | Branch | PR | Estado |
-|---|---|---|---|---|
-| M01 | Configuración base + Auth | `feature/m01-auth` | #1 | Mergeado en `main` |
-| M02 | Materias | `feature/m02-materias` | #2 | Mergeado en `main` |
-| M03 | Rúbricas y Criterios | `feature/m03-rubricas` | #4 | Mergeado en `main` |
-| M04 | Grupos | `feature/m04-grupos` | #6 | Mergeado en `main` |
-| M05 | Alumnos | `feature/m05-alumnos` | #8 | Mergeado en `main` |
+1. Ir a **Exposiciones** → botón **Nueva exposición**.
+2. Completar:
+   - Tema: `Herencia y polimorfismo en Java`
+   - Equipo: `Equipo Sigma`
+   - Fecha: `22/05/2026`
+3. Guardar.
 
-### Módulos completados — Jose Armando
+**Resultado esperado:** La exposición aparece en la lista con estado **pendiente**. El docente puede editarla o eliminarla hasta que la habilite. Los alumnos aún no la ven en su panel.
 
-| # | Módulo | Branch | PR | Estado |
-|---|---|---|---|---|
-| M06 | Equipos | `feature/m06-equipos` | #9 | Mergeado en `main` |
-| M07 | Exposiciones | `feature/m07-exposiciones` | #10 | Mergeado en `main` |
-| M08 | Permisos de Evaluación | `feature/m08-permisos` | #11 | Mergeado en `main` |
+---
 
-### Módulos completados — Roberto Gómez (correcciones y cierre)
+### Escenario 3 · Habilitar la evaluación
 
-| # | Módulo | Descripción | Estado |
-|---|---|---|---|
-| M07 | Exposiciones (fix) | Corrección de códigos 409→403 en operaciones de estado y validación de cierre con password | En `main` |
-| M08 | Permisos (fix) | Corrección crítica: bloquear reapertura si el alumno ya evaluó (RN01) | En `main` |
-| M09 | Evaluaciones | Implementación completa con cadena de validaciones RN09 y cálculo RN12 | En `main` |
+**Actor:** Docente  
+**Objetivo:** Abrir la ventana de coevaluación el día de la presentación
+
+1. El 22/05/2026, el Equipo Sigma termina su presentación.
+2. El docente va a **Exposiciones** → localiza la fila de `Herencia y polimorfismo`.
+3. Clic en **Habilitar** → selecciona ventana de **15 minutos** → confirma.
+4. El sistema en segundo plano:
+   - Cambia el estado de la exposición a **activa**.
+   - Crea permisos para los alumnos del grupo **4°A POO** **excepto** los del Equipo Sigma (Valeria y Ricardo, que expusieron).
+   - Camila (21031409) y Fernando (21031410) reciben permiso con `fecha_apertura = ahora`, `fecha_cierre = ahora + 15 min`.
+
+**Resultado esperado:**
+- El docente ve la exposición como **activa** con el botón de permisos disponible.
+- Camila y Fernando ven la exposición en su panel con el botón **Evaluar →** habilitado.
+- Valeria y Ricardo (Equipo Sigma) **no ven** la exposición — nunca se les generó permiso (RN08).
+
+---
+
+### Escenario 4 · Alumno registra una evaluación
+
+**Actor:** Camila Reyes (21031409, Equipo Lambda)  
+**Objetivo:** Calificar al Equipo Sigma dentro de la ventana
+
+1. Iniciar sesión como `21031409@itcelaya.edu.mx` / `alumnos`.
+2. Ir a **Evaluaciones** → tab **Registrar**.
+3. En el selector, aparece `Herencia y polimorfismo en Java`.
+4. Se cargan los 4 criterios de la rúbrica POO.
+5. Ajustar calificaciones: 10.0 / 8.5 / 8.5 / 8.5.
+6. El sistema calcula el promedio ponderado en tiempo real:
+   ```
+   (10.0×35 + 8.5×30 + 8.5×20 + 8.5×15) / 100
+   = (350 + 255 + 170 + 127.5) / 100
+   = 9.025 ≈ 9.03
+   ```
+7. Clic en **Enviar evaluación** → `HTTP 201 · Created`.
+
+**Resultado esperado:**
+- La evaluación queda registrada con `promedio = 9.03`.
+- En el panel de **Exposiciones** de Camila, la fila ahora muestra el badge **Evaluada** en lugar del botón **Evaluar →**.
+
+---
+
+### Escenario 5 · Alumno no evaluó a tiempo — el docente reabre el permiso
+
+**Actor:** Docente + Fernando Díaz (21031410)  
+**Objetivo:** Permitir que Fernando evalúe después de expirada la ventana
+
+1. La ventana de 15 minutos expiró. Fernando no pudo evaluar a tiempo.
+2. El docente va a **Exposiciones** → clic en el icono de personas de la fila.
+3. El modal **Permisos — Herencia y polimorfismo** muestra:
+   - Camila Reyes: Habilitado ✓ · Evaluado ✓ · Cierre: 15:30 (ya pasó)
+   - Fernando Díaz: Habilitado ✓ · Evaluado ✗ · Cierre: 15:30 (ya pasó)
+4. El docente hace clic en **Reabrir** en la fila de Fernando.
+5. El sistema actualiza: `habilitado = true`, `fecha_cierre = 2099-12-31` (sin restricción). La columna Cierre muestra el badge **Sin límite**.
+6. Fernando inicia sesión → ve la exposición activa → puede enviar su evaluación en cualquier momento.
+
+**Resultado esperado:** Fernando evalúa exitosamente. El modal de permisos actualiza su estado a **Evaluado ✓** al refrescar.
+
+---
+
+### Escenario 6 · Consultar resultados y matriz de evaluación
+
+**Actor:** Docente  
+**Objetivo:** Ver el desempeño del Equipo Sigma según las coevaluaciones
+
+1. Ir a **Evaluaciones** → tab **Listado** (o **Resultados**).
+2. El sistema muestra la exposición `Herencia y polimorfismo en Java` con:
+   - 2 evaluaciones
+   - Promedio grupo: 9.03 (si ambos evaluadores dieron la misma calificación)
+   - Badge: **Excelente**
+3. Clic en **Ver matriz**.
+4. Se abre la **Matriz de evaluación**:
+
+```
+EVALUADOR        C#9 (35%)   C#10 (30%)   C#11 (20%)   C#12 (15%)   PROMEDIO
+Camila Reyes     10.0        8.5          8.5          8.5           9.03
+Fernando Díaz     9.0        9.0          8.5          9.0           8.98
+─────────────────────────────────────────────────────────────────────────────
+Promedio grupo    9.5         8.8          8.5          8.8           9.00
+```
+
+**Interpretación del badge de desempeño:**
+
+| Promedio | Badge |
+|----------|-------|
+| ≥ 9.0 | Excelente |
+| ≥ 7.0 | Bueno |
+| ≥ 5.0 | Regular |
+| < 5.0 | Deficiente |
+
+---
+
+### Escenario 7 · Cerrar una exposición
+
+**Actor:** Docente  
+**Objetivo:** Archivar formalmente la exposición y bloquear nuevas evaluaciones
+
+1. Ir a **Exposiciones** → clic en **Cerrar** en la fila de `Herencia y polimorfismo`.
+2. El sistema solicita la contraseña del docente como confirmación.
+3. Ingresar `docente` → confirmar.
+4. El estado cambia a **cerrada**.
+
+**Resultado esperado:** La exposición queda archivada. Ya no acepta evaluaciones. Los botones de Habilitar y Cerrar desaparecen de la interfaz.
+
+---
+
+### Escenario 8 (negativo) · Alumno intenta evaluar su propio equipo
+
+**Actor:** Valeria González (21031411, Equipo Sigma)  
+**Objetivo:** Verificar que el sistema bloquea la autoevaluación
+
+1. Valeria inicia sesión el día de la exposición de su propio equipo.
+2. En **Evaluaciones** → **Registrar**, la exposición `Herencia y polimorfismo` **no aparece** en el selector — nunca se creó su permiso (RN08).
+3. Si intenta la petición directamente a la API:
+   ```
+   HTTP 403 · No puedes evaluar la exposicion de tu propio equipo
+   ```
+
+**Resultado esperado:** La autoevaluación queda bloqueada a nivel de interfaz y de API.
+
+---
+
+### Escenario 9 (negativo) · Alumno intenta evaluar dos veces
+
+**Actor:** Camila Reyes (ya evaluó)  
+**Objetivo:** Verificar que el sistema impide evaluaciones duplicadas
+
+1. Camila ya evaluó exitosamente.
+2. En su panel de **Exposiciones**, el botón **Evaluar →** ha sido reemplazado por el badge **Evaluada**.
+3. Si intenta enviar la petición directamente a la API:
+   ```
+   HTTP 409 · Ya has evaluado esta exposicion
+   ```
+4. Si el docente intenta reabrir su permiso:
+   ```
+   HTTP 409 · El alumno ya ha evaluado esta exposicion y el permiso no puede reabrirse
+   ```
+
+**Resultado esperado:** La integridad de los datos queda garantizada en UI y en API.
+
+---
+
+### Escenario 10 (negativo) · Envío fuera de la ventana de tiempo
+
+**Actor:** Fernando Díaz (permiso normal, no reabierto)  
+**Objetivo:** Verificar que la ventana de tiempo se respeta
+
+1. La ventana expiró a las 15:30. Fernando intenta evaluar a las 15:45.
+2. El sistema responde:
+   ```
+   HTTP 403 · La ventana de evaluacion ha expirado
+   ```
+3. El docente debe **Reabrir** el permiso de Fernando para que pueda evaluar (ver Escenario 5).
+
+**Resultado esperado:** El sistema rechaza la evaluación fuera de la ventana; el docente tiene el control para habilitarla de nuevo individualmente.

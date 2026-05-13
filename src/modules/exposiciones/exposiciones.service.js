@@ -36,29 +36,26 @@ const listar = async (user, page, size) => {
     };
   }
 
-  // Alumno: obtener su registro para conocer grupo y equipo
+  // Alumno: usar permisos_evaluacion como fuente de verdad (RN08 ya fue aplicado al habilitar)
   const { data: alumno } = await supabase
     .from('alumnos')
-    .select('id_alumno, id_grupo, id_equipo')
+    .select('id_alumno')
     .eq('id_usuario', user.id_usuario)
     .maybeSingle();
 
   if (!alumno) throw new AppError(404, 'El recurso solicitado no existe');
 
-  // FIX: obtener equipos del grupo sin join para evitar datos extra en la respuesta
-  const { data: equiposDelGrupo, error: equiposError } = await supabase
-    .from('equipos')
-    .select('id_equipo')
-    .eq('id_grupo', alumno.id_grupo);
+  const { data: permisos, error: permisosError } = await supabase
+    .from('permisos_evaluacion')
+    .select('id_exposicion, evaluado')
+    .eq('id_alumno', alumno.id_alumno)
+    .eq('habilitado', true);
 
-  if (equiposError) throw new AppError(500, 'Error al obtener exposiciones');
+  if (permisosError) throw new AppError(500, 'Error al obtener exposiciones');
 
-  // Excluir el equipo propio del alumno (RN08)
-  const idsEquipos = (equiposDelGrupo || [])
-    .map(e => e.id_equipo)
-    .filter(id => id !== alumno.id_equipo);
+  const idsExposiciones = (permisos || []).map(p => p.id_exposicion);
 
-  if (idsEquipos.length === 0) {
+  if (idsExposiciones.length === 0) {
     return { content: [], totalElements: 0, totalPages: 0, page, size };
   }
 
@@ -66,13 +63,22 @@ const listar = async (user, page, size) => {
     .from('exposiciones')
     .select('*', { count: 'exact' })
     .eq('estado', 'activa')
-    .in('id_equipo', idsEquipos)
+    .in('id_exposicion', idsExposiciones)
     .range(from, to);
 
   if (error) throw new AppError(500, 'Error al obtener exposiciones');
 
+  // Adjuntar estado evaluado del permiso a cada exposicion
+  const permisoMap = {};
+  for (const p of permisos || []) permisoMap[p.id_exposicion] = p;
+
+  const content = (data || []).map(exp => ({
+    ...exp,
+    _evaluado: permisoMap[exp.id_exposicion]?.evaluado ?? false,
+  }));
+
   return {
-    content: data,
+    content,
     totalElements: count,
     totalPages: count === 0 ? 0 : Math.ceil(count / size),
     page,
@@ -89,9 +95,12 @@ const crear = async ({ id_equipo, tema, fecha }) => {
 
   if (!equipo) throw new AppError(400, `El equipo con id ${id_equipo} no existe`);
 
+  // fecha viene como YYYY-MM-DDTHH:MM desde datetime-local; la columna es date → tomar solo la parte de fecha
+  const fechaNorm = fecha ? fecha.slice(0, 10) : undefined;
+
   const { data, error } = await supabase
     .from('exposiciones')
-    .insert({ id_equipo, tema, fecha, estado: 'pendiente' })
+    .insert({ id_equipo, tema, fecha: fechaNorm, estado: 'pendiente' })
     .select()
     .single();
 
@@ -116,9 +125,11 @@ const actualizar = async (id, { id_equipo, tema, fecha }) => {
 
   if (!equipo) throw new AppError(400, `El equipo con id ${id_equipo} no existe`);
 
+  const fechaNorm = fecha ? fecha.slice(0, 10) : undefined;
+
   const { data, error } = await supabase
     .from('exposiciones')
-    .update({ id_equipo, tema, fecha })
+    .update({ id_equipo, tema, fecha: fechaNorm })
     .eq('id_exposicion', id)
     .select()
     .single();

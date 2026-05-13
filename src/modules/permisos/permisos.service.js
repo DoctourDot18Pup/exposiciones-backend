@@ -34,24 +34,25 @@ const obtenerPermiso = async (id) => {
 };
 
 // FIX (RN01): no permitir reabrir si el alumno ya evaluó — evita evaluaciones duplicadas
-const reabrir = async (id, minutos_ventana) => {
+// fecha_cierre = null → sin restricción de tiempo (docente decide abrir indefinidamente)
+const reabrir = async (id) => {
   const permiso = await obtenerPermiso(id);
 
   if (permiso.evaluado) {
     throw new AppError(409, 'El alumno ya ha evaluado esta exposicion y el permiso no puede reabrirse');
   }
 
-  const fecha_apertura = new Date();
-  const fecha_cierre = new Date(fecha_apertura.getTime() + minutos_ventana * 60000);
-
   const { data, error } = await supabase
     .from('permisos_evaluacion')
-    .update({ habilitado: true, evaluado: false, fecha_apertura, fecha_cierre })
+    .update({ habilitado: true, evaluado: false, fecha_apertura: new Date().toISOString(), fecha_cierre: '2099-12-31T23:59:59.000Z' })
     .eq('id_permiso', id)
     .select()
     .single();
 
-  if (error) throw new AppError(500, 'Error al reabrir permiso');
+  if (error) {
+    console.error('[reabrir] Supabase error:', error);
+    throw new AppError(500, `Error al reabrir permiso: ${error.message}`);
+  }
 
   return data;
 };
