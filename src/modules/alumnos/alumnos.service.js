@@ -1,4 +1,4 @@
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const supabase = require('../../config/supabase');
 const { AppError } = require('../../middlewares/errorHandler.middleware');
 
