@@ -453,7 +453,7 @@ export default function Exposiciones() {
                     <td><EstadoBadge estado={exp.estado} /></td>
                     <td>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {exp.estado === 'activa' && !esDocente && (
+                        {!esDocente && exp.estado !== 'pendiente' && (
                           exp._evaluado
                             ? <span className="badge good" style={{ fontSize: 10, height: 28, display: 'inline-flex', alignItems: 'center' }}>
                                 Evaluada
