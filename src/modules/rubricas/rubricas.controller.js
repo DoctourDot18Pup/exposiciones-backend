@@ -120,6 +120,19 @@ const agregarCriterio = async (req, res, next) => {
   }
 };
 
+const obtenerCriterio = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id || id < 1) {
+      return res.status(400).json(formatError(400, 'ID invalido', req.originalUrl));
+    }
+    const criterio = await service.obtenerCriterio(id);
+    return res.status(200).json(criterio);
+  } catch (err) {
+    next(err);
+  }
+};
+
 const actualizarCriterio = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -152,5 +165,5 @@ const eliminarCriterio = async (req, res, next) => {
 
 module.exports = {
   listar, obtener, crear, actualizar, eliminar,
-  listarCriterios, agregarCriterio, actualizarCriterio, eliminarCriterio,
+  listarCriterios, agregarCriterio, obtenerCriterio, actualizarCriterio, eliminarCriterio,
 };

@@ -2,6 +2,10 @@ const { z } = require('zod');
 const equiposService = require('./equipos.service');
 const { formatError } = require('../../middlewares/errorHandler.middleware');
 
+const miembrosInputSchema = z.object({
+  alumnos: z.array(z.number().int().min(1)),
+});
+
 const equipoInputSchema = z.object({
   id_grupo: z.number().int().min(1),
   nombre_equipo: z.string().min(2).max(100),
@@ -125,10 +129,32 @@ const eliminar = async (req, res, next) => {
   }
 };
 
+const gestionarMiembros = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id || id < 1) {
+      return res.status(400).json(formatError(400, 'ID invalido', req.originalUrl));
+    }
+
+    const parsed = miembrosInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json(
+        formatError(400, parsed.error.issues[0]?.message || 'Datos invalidos', req.originalUrl)
+      );
+    }
+
+    const result = await equiposService.gestionarMiembros(id, parsed.data.alumnos);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   listar,
   obtener,
   crear,
   actualizar,
   eliminar,
+  gestionarMiembros,
 };

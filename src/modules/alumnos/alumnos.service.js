@@ -2,9 +2,15 @@ const bcrypt = require('bcrypt');
 const supabase = require('../../config/supabase');
 const { AppError } = require('../../middlewares/errorHandler.middleware');
 
+const normalizar = str =>
+  str.toLowerCase()
+     .normalize('NFD')
+     .replace(/[̀-ͯ]/g, '')   // strip diacritics: á→a, é→e, ñ→n, ü→u…
+     .replace(/[^a-z0-9]/g, '');        // keep only ascii alphanumeric
+
 const generarCredenciales = (apellido, matricula) => {
-  const prefijo = apellido.toLowerCase().slice(0, 4);
-  const sufijo = matricula.slice(-4);
+  const prefijo = normalizar(apellido).slice(0, 4);
+  const sufijo  = matricula.slice(-4);
   return {
     username: `${matricula}@${process.env.INSTITUTIONAL_DOMAIN}`,
     password_temporal: prefijo + sufijo,

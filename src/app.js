@@ -1,4 +1,6 @@
+const path = require('path');
 const express = require('express');
+const cors = require('cors');
 const authRoutes = require('./modules/auth/auth.routes');
 const materiasRoutes = require('./modules/materias/materias.routes');
 const { rubricasRouter, criteriosRouter } = require('./modules/rubricas/rubricas.routes');
@@ -12,7 +14,9 @@ const evaluacionesRoutes = require('./modules/evaluaciones/evaluaciones.routes')
 
 const app = express();
 
+app.use(cors({ origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'], credentials: true }));
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '../client')));
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/materias', materiasRoutes);

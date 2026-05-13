@@ -111,10 +111,35 @@ const eliminar = async (id) => {
   }
 };
 
+const gestionarMiembros = async (id_equipo, alumnosIds) => {
+  await obtener(id_equipo);
+
+  // Quitar id_equipo a los miembros actuales de este equipo
+  const { error: clearErr } = await supabase
+    .from('alumnos')
+    .update({ id_equipo: null })
+    .eq('id_equipo', id_equipo);
+
+  if (clearErr) throw new AppError(500, 'Error al actualizar miembros del equipo');
+
+  // Asignar el equipo a los nuevos miembros seleccionados
+  if (alumnosIds.length > 0) {
+    const { error: setErr } = await supabase
+      .from('alumnos')
+      .update({ id_equipo })
+      .in('id_alumno', alumnosIds);
+
+    if (setErr) throw new AppError(500, 'Error al asignar miembros al equipo');
+  }
+
+  return { id_equipo, miembros: alumnosIds.length };
+};
+
 module.exports = {
   listar,
   obtener,
   crear,
   actualizar,
   eliminar,
+  gestionarMiembros,
 };

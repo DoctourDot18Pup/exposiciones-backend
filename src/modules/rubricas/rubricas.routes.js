@@ -17,6 +17,7 @@ rubricasRouter.get('/:id/criterios', authenticate, ctrl.listarCriterios);
 rubricasRouter.post('/:id/criterios', authenticate, requireRole('docente'), ctrl.agregarCriterio);
 
 // ── /api/v1/criterios ─────────────────────────────────────────────────────────
+criteriosRouter.get('/:id', authenticate, ctrl.obtenerCriterio);
 criteriosRouter.put('/:id', authenticate, requireRole('docente'), ctrl.actualizarCriterio);
 criteriosRouter.delete('/:id', authenticate, requireRole('docente'), ctrl.eliminarCriterio);
 

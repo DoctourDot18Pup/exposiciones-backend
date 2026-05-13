@@ -5,7 +5,9 @@ const { formatError } = require('../../middlewares/errorHandler.middleware');
 const exposicionInputSchema = z.object({
   id_equipo: z.number().int().min(1),
   tema: z.string().min(3).max(200),
-  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  // Accept YYYY-MM-DD or YYYY-MM-DDTHH:MM (datetime-local)
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
+  aula: z.string().max(50).optional(),
 });
 
 const habilitarInputSchema = z.object({
