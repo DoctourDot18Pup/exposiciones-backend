@@ -273,7 +273,7 @@ function TabRegistro({ exposiciones, session }) {
   const [err, setErr]               = useState(null)
   const [resp, setResp]             = useState(null)
 
-  const activas = exposiciones.filter(e => e.estado === 'activa')
+  const activas = exposiciones.filter(e => e.estado !== 'pendiente')
 
   useEffect(() => {
     if (!idExp) { setCriterios([]); setCalifs({}); return }
@@ -342,7 +342,7 @@ function TabRegistro({ exposiciones, session }) {
         </div>
         <div className="card-pad">
           <div className="field" style={{ marginTop: 0 }}>
-            <label>Exposición activa</label>
+            <label>Exposición disponible</label>
             <select className="input" value={idExp}
                     onChange={e => { setIdExp(e.target.value); setErr(null); setResp(null) }} required>
               <option value="">Seleccionar…</option>
@@ -351,7 +351,7 @@ function TabRegistro({ exposiciones, session }) {
               ))}
             </select>
             {activas.length === 0 && (
-              <p style={{ fontSize: 12, color: 'var(--ink-500)', marginTop: 4 }}>No hay exposiciones activas.</p>
+              <p style={{ fontSize: 12, color: 'var(--ink-500)', marginTop: 4 }}>No hay exposiciones disponibles para evaluar.</p>
             )}
           </div>
 
